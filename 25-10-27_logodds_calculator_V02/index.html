@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log-Odds, Odds, and Probability Converter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'chiikawa-pink': '#FFD0E0',
+                        'chiikawa-blue': '#B3E0FF',
+                        'chiikawa-yellow': '#FFEBB3',
+                        'chiikawa-main': '#FF70A6',
+                        /* Using a medium blue for the switch ON state for better contrast */
+                        'chiikawa-switch-on': '#7AC2F5', 
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styling for the input areas (Textareas) */
+        .calculator-area {
+            min-height: 150px;
+            resize: vertical;
+            font-size: 0.875rem; /* text-sm */
+        }
+        .copy-area-font {
+            font-size: 0.75rem; 
+            line-height: 1rem; 
+        }
+        .formula-font {
+            font-size: 0.875rem; 
+        }
+        /* Specific styling for the formula boxes */
+        .formula-box h3 {
+             font-size: 1.125rem; 
+             font-weight: 600; 
+             color: #374151; 
+             margin-bottom: 0.5rem;
+        }
+        .formula-box ul {
+            list-style: none; 
+            padding-left: 0;
+            margin-left: 0;
+        }
+        .formula-box li {
+            font-family: monospace; 
+            padding: 0.25rem 0;
+        }
+        /* --- Physics Simulation Styles --- */
+        #sparkle-container {
+            position: fixed; 
+            inset: 0;
+            pointer-events: none; 
+            overflow: hidden;
+            z-index: 9999; 
+            transition: opacity 0.3s ease-in-out;
+            opacity: 1; /* Default to ON */
+        }
+        .sparkle-container-off {
+            opacity: 0 !important;
+        }
+        .sparkle-element {
+            position: absolute;
+            pointer-events: auto; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: translate(-50%, -50%); 
+            transition: opacity 0.2s; 
+            cursor: pointer; 
+            user-select: none; 
+        }
+        #card-container {
+            position: relative; 
+            z-index: 100; 
+        }
+        .gif-image {
+            width: 100%; 
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        /* --- CSS Toggle Switch Styles --- */
+        .toggle-switch-container {
+            /* **MODIFIED:** Smaller width and blue background */
+            width: 80px; /* Reduced from 100px */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 0.25rem; /* Reduced padding */
+            border-radius: 0.5rem;
+            background-color: theme('colors.chiikawa-blue'); /* Added background color */
+        }
+        .toggle-switch-container label {
+            position: relative;
+            display: inline-block;
+            /* **MODIFIED:** Smaller size */
+            width: 60px; /* Reduced from 80px */
+            height: 28px; /* Reduced from 34px */
+            margin-bottom: 0; 
+            cursor: pointer;
+        }
+
+        .toggle-switch-container input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #B3E0FF;
+            transition: 0.4s;
+            /* **MODIFIED:** Smaller border radius */
+            border-radius: 28px; 
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            /* **MODIFIED:** Smaller circle size and position */
+            height: 20px; /* Reduced from 26px */
+            width: 20px; /* Reduced from 26px */
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            /* Changed to chiikawa-switch-on blue for ON state */
+            background-color: theme('colors.chiikawa-switch-on'); 
+        }
+
+        input:checked + .slider:before {
+            /* **MODIFIED:** New translateX value (60px - 4px left - 4px bottom - 20px width = 32px movement) */
+            transform: translateX(32px); 
+        }
+        
+        /* Text labels for ON/OFF */
+        .slider-text {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            /* **MODIFIED:** Even smaller font size (9px) */
+            font-size: 9px; 
+            font-weight: bold;
+            color: #333; /* Dark gray/Black */
+            transition: opacity 0.4s;
+            user-select: none;
+        }
+
+        .slider-on {
+            /* **MODIFIED:** Adjusted position */
+            right: 8px; 
+            opacity: 0;
+        }
+
+        .slider-off {
+            /* **MODIFIED:** Adjusted position */
+            left: 8px; 
+            color: #333; 
+            opacity: 1;
+        }
+
+        input:checked ~ .slider .slider-on {
+            opacity: 1;
+        }
+
+        input:checked ~ .slider .slider-off {
+            opacity: 0;
+        }
+        /* End Switch Styles */
+
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 font-sans">
+
+    <div id="card-container" class="bg-white p-8 sm:p-10 rounded-xl shadow-2xl max-w-4xl w-full">
+        <h1 class="text-3xl sm:text-4xl font-bold text-indigo-700 mb-6 border-b-2 pb-2">
+            Log-Odds, Odds, and Probability Converter
+        </h1>
+        <p class="text-gray-600 mb-6">
+            Paste a list of values (separated by commas, spaces, or newlines) into <strong>only one</strong> of the three boxes, then click the <strong>Calculate</strong> button.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            
+            <div class="p-4 bg-chiikawa-blue rounded-lg shadow">
+                <h2 class="text-base font-semibold text-chiikawa-main mb-3 whitespace-nowrap">Log-Odds (Input)</h2>
+                <textarea id="logOddsInput" class="calculator-area w-full p-2 border-2 border-chiikawa-main rounded focus:outline-none focus:ring-2 focus:ring-chiikawa-pink"></textarea>
+            </div>
+
+            <div class="p-4 bg-chiikawa-yellow rounded-lg shadow">
+                <h2 class="text-base font-semibold text-chiikawa-main mb-3 whitespace-nowrap">Odds (Input)</h2>
+                <textarea id="oddsInput" class="calculator-area w-full p-2 border-2 border-chiikawa-main rounded focus:outline-none focus:ring-2 focus:ring-chiikawa-pink"></textarea>
+            </div>
+
+            <div class="p-4 bg-chiikawa-pink rounded-lg shadow">
+                <h2 class="text-base font-semibold text-chiikawa-main mb-3 whitespace-nowrap">Probability (P) [0-1] (Input)</h2>
+                <textarea id="pInput" class="calculator-area w-full p-2 border-2 border-chiikawa-main rounded focus:outline-none focus:ring-2 focus:ring-chiikawa-yellow"></textarea>
+            </div>
+
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-10 space-y-4 sm:space-y-0 sm:space-x-4">
+            
+            <div class="flex space-x-4">
+                <button id="calculateButton"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-150 ease-in-out transform hover:scale-105">
+                    Calculate Conversions 🚀
+                </button>
+                <button id="clearAllButton"
+                        class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-150 ease-in-out transform hover:scale-105">
+                    Clear All 
+                </button>
+            </div>
+
+            <div class="toggle-switch-container">
+                 <p class="text-gray-600 text-sm font-semibold mb-2">Animation</p>
+                <label for="gifToggleButton">
+                    <input type="checkbox" id="gifToggleButton" checked>
+                    <span class="slider">
+                        <span class="slider-text slider-on">ON</span>
+                        <span class="slider-text slider-off">OFF</span>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+
+        <div class="mt-8">
+            <h3 class="text-2xl font-bold text-indigo-700 mb-3 flex justify-between items-center">
+                <span>Copy Single Columns (High Precision) 📋</span>
+                <span id="rowCount" class="text-lg font-bold text-indigo-700 hidden"></span>
+            </h3>
+            <p class="text-sm text-gray-600 mb-4">Click into the desired box, press Ctrl+A (or Cmd+A) to select all, then Ctrl+C to copy only that column.</p>
+            
+            <div id="columnOutputContainer" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Log-Odds</label>
+                    <textarea id="logOddsColumnOutput" class="w-full h-80 p-3 border border-chiikawa-blue rounded-lg bg-gray-50 font-mono copy-area-font" readonly></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Odds</label>
+                    <textarea id="oddsColumnOutput" class="w-full h-80 p-3 border border-chiikawa-yellow rounded-lg bg-gray-50 font-mono copy-area-font" readonly></textarea>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Probability (P)</label>
+                    <textarea id="pColumnOutput" class="w-full h-80 p-3 border border-chiikawa-pink rounded-lg bg-gray-50 font-mono copy-area-font" readonly></textarea>
+                </div>
+            </div>
+            
+            <p id="initialMessage" class="text-gray-500 mt-4">Click 'Calculate Conversions' to see results.</p>
+        </div>
+
+        <div class="mt-12 pt-6 border-t-2 border-gray-200">
+            <h2 class="text-xl font-bold text-indigo-700 mb-4">Conversion Formulas & Definitions</h2>
+            <div class="space-y-6">
+                <div class="p-4 border border-gray-300 rounded-lg bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Key Definitions</h3>
+                    <ul class="list-disc list-inside ml-4 space-y-1 text-[0.78rem] text-gray-700">
+                        <li><strong>Log-Odds (L):</strong> The natural logarithm (ln) of the Odds (L = ln(O)).</li>
+                        <li><strong>Odds (O):</strong> The ratio of the probability of success to the probability of failure (O = P / (1 - P)). Ranges from 0 to &infin;.</li>
+                        <li><strong>Probability (P):</strong> The likelihood of an event occurring, expressed as a proportion between 0 (impossible) and 1 (certain).</li>
+                    </ul>
+                </div>
+                
+                <div class="formula-box p-4 rounded-lg shadow-sm bg-chiikawa-blue border border-chiikawa-main/50">
+                    <h3 class="text-indigo-900">1. Starting with Log-Odds (L)</h3>
+                    <p class="text-gray-700 mb-2">To convert:</p>
+                    <ul class="ml-4 formula-font space-y-1 text-gray-800">
+                        <li>To Odds: Odds = e<sup>L</sup></li>
+                        <li>To Probability: P = e<sup>L</sup> / (1 + e<sup>L</sup>)</li>
+                    </ul>
+                </div>
+
+                <div class="formula-box p-4 rounded-lg shadow-sm bg-chiikawa-yellow border border-chiikawa-main/50">
+                    <h3 class="text-indigo-900">2. Starting with Odds (O)</h3>
+                    <p class="text-gray-700 mb-2">To convert:</p>
+                    <ul class="ml-4 formula-font space-y-1 text-gray-800">
+                        <li>To Log-Odds: L = ln(Odds)</li>
+                        <li>To Probability: P = Odds / (1 + Odds)</li>
+                    </ul>
+                </div>
+
+                <div class="formula-box p-4 rounded-lg shadow-sm bg-chiikawa-pink border border-chiikawa-main/50">
+                    <h3 class="text-indigo-900">3. Starting with Probability (P)</h3>
+                    <p class="text-gray-700 mb-2">To convert:</p>
+                    <ul class="ml-4 formula-font space-y-1 text-gray-800">
+                        <li>To Odds: Odds = P / (1 - P)</li>
+                        <li>To Log-Odds: L = ln( P / (1 - P) )</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 text-right text-xs text-gray-400">
+            Last Updated: October 27, 2025
+        </div>
+    </div>
+
+    <div id="sparkle-container"></div>
+
+
+    <script>
+        // --- Core Conversion Functions and Constants ---
+        const logOddsToOdds = (logOdds) => Math.exp(logOdds);
+        const oddsToP = (odds) => odds / (1 + odds);
+        const pToOdds = (p) => {
+            if (p === 1) return Infinity;
+            if (p === 0) return 0;
+            return p / (1 - p);
+        };
+        const oddsToLogOdds = (odds) => Math.log(odds);
+        const pToLogOdds = (p) => oddsToLogOdds(pToOdds(p));
+        const logOddsToP = (logOdds) => oddsToP(logOddsToOdds(logOdds));
+
+        const NOT_CONVERTIBLE_MSG = '[Not Convertible]';
+        const DECIMAL_PLACES = 20;
+
+        // --- DOM Elements ---
+        const logOddsInput = document.getElementById('logOddsInput');
+        const oddsInput = document.getElementById('oddsInput');
+        const pInput = document.getElementById('pInput');
+        const calculateButton = document.getElementById('calculateButton');
+        const clearAllButton = document.getElementById('clearAllButton'); 
+        const initialMessage = document.getElementById('initialMessage');
+        const rowCountElement = document.getElementById('rowCount');
+        // GIF switch element
+        const gifToggleButton = document.getElementById('gifToggleButton'); 
+        
+        const columnOutputContainer = document.getElementById('columnOutputContainer');
+        const logOddsColumnOutput = document.getElementById('logOddsColumnOutput');
+        const oddsColumnOutput = document.getElementById('oddsColumnOutput');
+        const pColumnOutput = document.getElementById('pColumnOutput');
+        
+        // --- Physics Engine Constants and State ---
+        const SPEED = 0.3; 
+        const LAUNCH_SPEED = 5.0; 
+        const SIZE = 80; 
+        const COLLISION_DISTANCE_SQ = SIZE * SIZE; 
+        const MAX_SPARKLES = 3; 
+        
+        let sparkles = []; 
+        let animationFrameId = null; 
+        // State variable for GIF animation, default ON (checked)
+        let isGifEnabled = true; 
+        
+        const sparkleContainer = document.getElementById('sparkle-container');
+        const cardContainer = document.getElementById('card-container'); 
+
+        // Local file names used for the GIFs
+        const characterGifs = [
+            'chiikawa-usagi.gif', 
+            'chiikawa.gif',
+            'hachiware.gif' 
+        ];
+
+
+        // --- GIF Toggle Logic ---
+
+        function toggleGifStatus() {
+            // Read state directly from the checkbox
+            isGifEnabled = gifToggleButton.checked;
+            updateGifContainerVisibility();
+        }
+
+        function updateGifContainerVisibility() {
+            if (isGifEnabled) {
+                sparkleContainer.classList.remove('sparkle-container-off');
+                // Restart animation if characters are present 
+                if (sparkles.length > 0) {
+                     startLoop();
+                }
+            } else {
+                sparkleContainer.classList.add('sparkle-container-off');
+                resetSparkles(false); // Stop loop, but keep elements in DOM for quick restart
+            }
+        }
+
+        // --- Physics Engine Functions ---
+
+        function getRandomStartCoord(max) {
+             return Math.random() * max;
+        }
+
+        function handleSparkleClick(sparkle) {
+            let angle = Math.random() * 2 * Math.PI;
+            
+            sparkle.dx = Math.cos(angle) * LAUNCH_SPEED;
+            sparkle.dy = Math.sin(angle) * LAUNCH_SPEED;
+            
+            setTimeout(() => {
+                const speedFactor = Math.sqrt(sparkle.dx * sparkle.dx + sparkle.dy * sparkle.dy);
+                if (speedFactor > 0) {
+                    sparkle.dx = (sparkle.dx / speedFactor) * SPEED;
+                    sparkle.dy = (sparkle.dy / speedFactor) * SPEED;
+                }
+            }, 500); 
+        }
+
+
+        function update() {
+            if (!isGifEnabled) {
+                 // Stop the update loop immediately if disabled
+                 cancelAnimationFrame(animationFrameId);
+                 animationFrameId = null;
+                 return;
+            }
+
+            const containerWidth = sparkleContainer.offsetWidth;
+            const containerHeight = sparkleContainer.offsetHeight;
+
+            for (let i = 0; i < sparkles.length; i++) {
+                const s = sparkles[i];
+
+                // 1. Update position
+                s.x += s.dx;
+                s.y += s.dy;
+                
+                // 2. Viewport Boundary Collision (Bouncing off screen edges)
+                if (s.x < SIZE / 2 || s.x > containerWidth - SIZE / 2) {
+                    s.dx *= -1; 
+                    s.x = Math.max(SIZE / 2, Math.min(s.x, containerWidth - SIZE / 2)); 
+                }
+                if (s.y < SIZE / 2 || s.y > containerHeight - SIZE / 2) {
+                    s.dy *= -1; 
+                    s.y = Math.max(SIZE / 2, Math.min(s.y, containerHeight - SIZE / 2)); 
+                }
+
+                // 3. Inter-GIF Collision (Bouncing off each other)
+                for (let j = i + 1; j < sparkles.length; j++) {
+                    const s2 = sparkles[j];
+                    const dx = s.x - s2.x;
+                    const dy = s.y - s2.y;
+                    const distanceSq = dx * dx + dy * dy;
+
+                    if (distanceSq < COLLISION_DISTANCE_SQ && distanceSq > 0) {
+                        const distance = Math.sqrt(distanceSq);
+                        const overlap = (SIZE - distance) / 2;
+                        
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+
+                        s.x += nx * overlap;
+                        s.y += ny * overlap;
+                        s2.x -= nx * overlap;
+                        s2.y -= ny * overlap; 
+
+                        s.dx *= -1;
+                        s.dy *= -1;
+                        s2.dx *= -1;
+                        s2.dy *= -1;
+                    }
+                }
+
+                // 4. Apply changes to DOM
+                s.element.style.transform = `translate(-50%, -50%) translate(${s.x}px, ${s.y}px)`;
+            }
+
+            animationFrameId = requestAnimationFrame(update);
+        }
+
+        function startLoop() {
+            if (isGifEnabled && !animationFrameId) {
+                animationFrameId = requestAnimationFrame(update);
+            }
+        }
+
+        function resetSparkles(clearElements = true) {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (clearElements) {
+                sparkleContainer.innerHTML = '';
+                sparkles = [];
+            }
+        }
+
+        function launchTrio() {
+            if (!isGifEnabled) {
+                return; 
+            }
+            
+            resetSparkles(true); // Always clear previous GIFs before launching new ones
+            
+            const containerWidth = sparkleContainer.offsetWidth;
+            const containerHeight = sparkleContainer.offsetHeight;
+            
+            for (let i = 0; i < MAX_SPARKLES; i++) {
+                const element = document.createElement('div');
+                element.className = `sparkle-element opacity-0`; 
+                
+                element.style.width = `${SIZE}px`;
+                element.style.height = `${SIZE}px`;
+                
+                element.innerHTML = `<img src="${characterGifs[i]}" class="gif-image" draggable="false" alt="Character ${i + 1}">`;
+
+                const startX = getRandomStartCoord(containerWidth);
+                const startY = getRandomStartCoord(containerHeight);
+
+                element.style.left = `0px`;
+                element.style.top = `0px`; 
+
+                let angle = Math.random() * 2 * Math.PI;
+                let speedFactor = SPEED; 
+                let dx = Math.cos(angle) * speedFactor;
+                let dy = Math.sin(angle) * speedFactor;
+                
+                const newSparkle = { element, x: startX, y: startY, dx, dy };
+                
+                element.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    handleSparkleClick(newSparkle);
+                });
+
+                sparkles.push(newSparkle);
+                sparkleContainer.appendChild(element);
+                
+                startLoop();
+                
+                setTimeout(() => {
+                    element.style.opacity = '1';
+                }, 100); 
+            }
+        }
+
+        // --- Converter Logic Functions ---
+        function parseInput(text) {
+            const parts = text.split(/[\s,]+/).filter(val => val.trim() !== '');
+            const parsedInputs = [];
+            for (const part of parts) {
+                const num = parseFloat(part);
+                if (isNaN(num)) {
+                    parsedInputs.push({ original: part, value: part });
+                } else {
+                    parsedInputs.push({ original: part, value: num });
+                }
+            }
+            return parsedInputs;
+        }
+
+        function calculate(type, inputs) {
+            const results = [];
+            let conversionFn;
+            if (type === 'logOdds') {
+                conversionFn = (val) => ({ logOdds: val, odds: logOddsToOdds(val), p: logOddsToP(val) });
+            } else if (type === 'odds') {
+                conversionFn = (val) => ({ logOdds: oddsToLogOdds(val), odds: val, p: oddsToP(val) });
+            } else if (type === 'p') {
+                conversionFn = (val) => ({ logOdds: pToLogOdds(val), odds: pToOdds(val), p: val });
+            } 
+
+            inputs.forEach(input => {
+                const result = {};
+                const val = input.value;
+                if (typeof val === 'string') {
+                    result[type] = input.original; 
+                    result.logOdds = result.odds = result.p = NOT_CONVERTIBLE_MSG;
+                } else {
+                    const converted = conversionFn(val);
+                    result.logOdds = converted.logOdds;
+                    result.odds = converted.odds;
+                    result.p = converted.p;
+                    result[type] = val; 
+                }
+                results.push(result);
+            });
+            renderColumnOutput(results);
+        }
+
+        function renderColumnOutput(results) {
+            if (results.length === 0) {
+                columnOutputContainer.classList.add('hidden');
+                rowCountElement.classList.add('hidden');
+                logOddsColumnOutput.value = oddsColumnOutput.value = pColumnOutput.value = '';
+                if (!initialMessage.classList.contains('text-red-600')) {
+                    initialMessage.classList.remove('hidden');
+                    initialMessage.textContent = 'Click \'Calculate Conversions\' to see results.';
+                }
+                return;
+            }
+            
+            const format = (value) => {
+                if (typeof value === 'string') return value;
+                if (!isFinite(value)) return value.toString();
+                let str = value.toFixed(DECIMAL_PLACES);
+                str = str.replace(/0+$/, "");
+                str = str.replace(/\.$/, "");
+                return str;
+            };
+
+            let logOddsValues = [];
+            let oddsValues = [];
+            let pValues = [];
+
+            results.forEach(r => {
+                logOddsValues.push(format(r.logOdds));
+                oddsValues.push(format(r.odds));
+                pValues.push(format(r.p));
+            });
+
+            logOddsColumnOutput.value = logOddsValues.join('\n');
+            oddsColumnOutput.value = oddsValues.join('\n');
+            pColumnOutput.value = pValues.join('\n');
+            
+            rowCountElement.innerHTML = `Rows: <span class="text-indigo-900">${results.length}</span>`;
+            rowCountElement.classList.remove('hidden');
+            
+            columnOutputContainer.classList.remove('hidden');
+            initialMessage.classList.add('hidden');
+        }
+
+        function clearAll() {
+            logOddsInput.value = '';
+            oddsInput.value = '';
+            pInput.value = '';
+            renderColumnOutput([]); 
+            resetSparkles(); 
+
+            initialMessage.textContent = 'Click \'Calculate Conversions\' to see results.';
+            initialMessage.classList.remove('hidden', 'text-red-600', 'font-semibold');
+            initialMessage.classList.add('text-gray-500');
+        }
+
+        function processCalculation() {
+            const logOddsText = logOddsInput.value.trim();
+            const oddsText = oddsInput.value.trim();
+            const pText = pInput.value.trim();
+            
+            const filledInputs = [
+                { type: 'logOdds', text: logOddsText, input: logOddsInput },
+                { type: 'odds', text: oddsText, input: oddsInput },
+                { type: 'p', text: pText, input: pInput }
+            ].filter(i => i.text !== '');
+
+            // Enforce single-column input
+            if (filledInputs.length === 0) {
+                initialMessage.textContent = 'Please enter values into one of the three boxes.';
+                initialMessage.classList.remove('hidden', 'text-red-600', 'font-semibold');
+                initialMessage.classList.add('text-gray-500');
+                renderColumnOutput([]); 
+                resetSparkles();
+                return;
+            } else if (filledInputs.length > 1) {
+                initialMessage.textContent = 'Error: Please enter values into ONLY ONE of the three boxes. Use the "Clear All" button to reset.';
+                initialMessage.classList.remove('hidden', 'text-gray-500');
+                initialMessage.classList.add('text-red-600', 'font-semibold');
+                renderColumnOutput([]);
+                resetSparkles();
+                return;
+            }
+            
+            const singleInput = filledInputs[0];
+            const type = singleInput.type;
+            const text = singleInput.text;
+            
+            const parsedInputs = parseInput(text);
+
+            if (parsedInputs.length === 0) {
+                initialMessage.textContent = 'No entries were found in the input box.';
+                initialMessage.classList.remove('hidden', 'text-gray-500');
+                initialMessage.classList.add('text-red-600', 'font-semibold');
+                renderColumnOutput([]);
+                resetSparkles(); 
+                return;
+            }
+
+            let rangeError = false;
+            for (const input of parsedInputs) {
+                const val = input.value;
+                if (typeof val === 'number') {
+                    if (type === 'odds' && val <= 0) { rangeError = true; break; }
+                    if (type === 'p' && (val < 0 || val > 1)) { rangeError = true; break; }
+                }
+            }
+
+            if (rangeError) {
+                initialMessage.textContent = `Input Error: Values outside valid range for ${type}. Please correct and try again.`;
+                initialMessage.classList.remove('hidden', 'text-gray-500');
+                initialMessage.classList.add('text-red-600', 'font-semibold'); 
+                renderColumnOutput([]);
+                resetSparkles(); 
+                return;
+            }
+
+            // Clear the other two boxes (this remains correct, as only one can be filled now)
+            if (type !== 'logOdds') logOddsInput.value = '';
+            if (type !== 'odds') oddsInput.value = '';
+            if (type !== 'p') pInput.value = '';
+
+            initialMessage.classList.remove('text-red-600', 'font-semibold');
+            initialMessage.classList.add('text-gray-500');
+            initialMessage.classList.add('hidden'); 
+            
+            calculate(type, parsedInputs); 
+            launchTrio();
+        }
+
+        // --- Attach Event Listeners ---
+        calculateButton.addEventListener('click', processCalculation);
+        clearAllButton.addEventListener('click', clearAll); 
+        // Event listener for the toggle switch (checkbox)
+        gifToggleButton.addEventListener('change', toggleGifStatus); 
+
+        window.addEventListener('resize', () => {
+             if (animationFrameId) {
+                 cancelAnimationFrame(animationFrameId);
+                 animationFrameId = null;
+                 startLoop();
+             }
+        });
+
+        // Initialize state on load
+        isGifEnabled = gifToggleButton.checked;
+        updateGifContainerVisibility();
+    </script>
+</body>
+</html>
