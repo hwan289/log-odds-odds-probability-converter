@@ -191,6 +191,8 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 font-sans">
 
+    <div id="copyPopup" class="fixed inset-x-0 top-0 mx-auto w-fit max-w-sm px-4 py-2 mt-4 bg-indigo-600 text-white font-semibold text-sm rounded-full shadow-2xl opacity-0 transition-opacity duration-300 pointer-events-none z-[10001]">Copied to Clipboard! 📋</div>
+
     <div id="card-container" class="bg-white p-8 sm:p-10 rounded-xl shadow-2xl max-w-4xl w-full">
         <h1 class="text-3xl sm:text-4xl font-bold text-indigo-700 mb-6 border-b-2 pb-2">
             Log-Odds, Odds, and Probability Converter
@@ -249,7 +251,7 @@
                 <span>Copy Single Columns (High Precision) 📋</span>
                 <span id="rowCount" class="text-lg font-bold text-indigo-700 hidden"></span>
             </h3>
-            <p class="text-sm text-gray-600 mb-4">Click into the desired box, press Ctrl+A (or Cmd+A) to select all, then Ctrl+C to copy only that column.</p>
+            <p id="copyInstruction" class="text-sm text-gray-600 mb-4 hidden"><strong>Click</strong> any result box below to <strong>automatically copy</strong> the entire column to your clipboard.</p>
             
             <div id="columnOutputContainer" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4">
                 
@@ -313,8 +315,8 @@
             </div>
         </div>
 
-        <div class="mt-8 text-right text-xs text-gray-400">
-            Last Updated: October 27, 2025
+        <div class="mt-8 text-right text-xs text-gray-700">
+            First Created: October 27, 2025 | <span class="text-blue-700">Last Updated: October 28, 2025</span> 
         </div>
     </div>
 
@@ -353,6 +355,11 @@
         const oddsColumnOutput = document.getElementById('oddsColumnOutput');
         const pColumnOutput = document.getElementById('pColumnOutput');
         
+        // ADDED: Popup Element Reference
+        const copyPopup = document.getElementById('copyPopup');
+        // ADDED: Copy Instruction Reference
+        const copyInstruction = document.getElementById('copyInstruction');
+
         // --- Physics Engine Constants and State ---
         const SPEED = 0.3; 
         const LAUNCH_SPEED = 5.0; 
@@ -593,6 +600,7 @@
             if (results.length === 0) {
                 columnOutputContainer.classList.add('hidden');
                 rowCountElement.classList.add('hidden');
+                copyInstruction.classList.add('hidden'); // ADDED: Hide instruction on empty results
                 logOddsColumnOutput.value = oddsColumnOutput.value = pColumnOutput.value = '';
                 if (!initialMessage.classList.contains('text-red-600')) {
                     initialMessage.classList.remove('hidden');
@@ -627,6 +635,7 @@
             rowCountElement.innerHTML = `Rows: <span class="text-indigo-900">${results.length}</span>`;
             rowCountElement.classList.remove('hidden');
             
+            copyInstruction.classList.remove('hidden'); // ADDED: Show instruction on valid results
             columnOutputContainer.classList.remove('hidden');
             initialMessage.classList.add('hidden');
         }
@@ -730,6 +739,37 @@
                  startLoop();
              }
         });
+
+        // Copy function using modern Clipboard API with selection and popup
+        function selectAllTextAndCopy(event) {
+            const textToCopy = event.target.value; // 1. Get the content
+            event.target.select(); // 2. Select it visually
+
+            // 3. Use the modern Clipboard API to copy (asynchronous and reliable)
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                    // Show popup on successful copy
+                    copyPopup.classList.remove('opacity-0');
+                    copyPopup.classList.add('opacity-100');
+                    setTimeout(() => {
+                        copyPopup.classList.remove('opacity-100');
+                        copyPopup.classList.add('opacity-0');
+                    }, 2000); // Hide after 2 seconds
+                })
+                .catch(err => {
+                    // Fallback to the deprecated execCommand if the modern API fails or is unavailable
+                    console.error('Clipboard API failed, trying document.execCommand:', err);
+                    try {
+                        document.execCommand('copy');
+                    } catch (err2) {
+                        console.error('Final copy fallback failed.', err2);
+                    }
+                });
+        }
+
+        logOddsColumnOutput.addEventListener('click', selectAllTextAndCopy);
+        oddsColumnOutput.addEventListener('click', selectAllTextAndCopy);
+        pColumnOutput.addEventListener('click', selectAllTextAndCopy);
 
         // Initialize state on load
         isGifEnabled = gifToggleButton.checked;
