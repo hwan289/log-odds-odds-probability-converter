@@ -248,7 +248,7 @@
 
         <div class="mt-8">
             <h3 class="text-2xl font-bold text-indigo-700 mb-3 flex justify-between items-center">
-                <span>Copy Single Columns (High Precision) 📋</span>
+                <span>Copy Single Columns 📋</span>
                 <span id="rowCount" class="text-lg font-bold text-indigo-700 hidden"></span>
             </h3>
             <p id="copyInstruction" class="text-sm text-gray-600 mb-4 hidden"><strong>Click</strong> any result box below to <strong>automatically copy</strong> the entire column to your clipboard.</p>
@@ -609,10 +609,27 @@
                 return;
             }
             
+            // MODIFIED: Use the significant figure precision (15) instead of fixed decimal places (20)
+            const SIGNIFICANT_PLACES = 15; 
+
             const format = (value) => {
                 if (typeof value === 'string') return value;
                 if (!isFinite(value)) return value.toString();
-                let str = value.toFixed(DECIMAL_PLACES);
+                
+                // Use toPrecision(15) to maintain significant digits for a double-precision float.
+                let str = value.toPrecision(SIGNIFICANT_PLACES); 
+
+                // The toPrecision method can sometimes result in exponential notation for very 
+                // small numbers (e.g., 1e-12). We'll convert it back to fixed format if 
+                // it doesn't contain 'e' or 'E' and is not extremely large/small.
+                if (str.includes('e') || str.includes('E')) {
+                    // For results in scientific notation, we revert to the original toFixed logic
+                    // using the high-precision constant (DECIMAL_PLACES=20) for clarity, 
+                    // but remove trailing zeros and decimal point if alone.
+                    str = value.toFixed(DECIMAL_PLACES);
+                }
+
+                // Clean up trailing zeros and decimal point (for both toPrecision and toFixed results)
                 str = str.replace(/0+$/, "");
                 str = str.replace(/\.$/, "");
                 return str;
